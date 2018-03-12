@@ -37,7 +37,7 @@ type StaticTree struct {
 	// 3   A B C D   E
 	//
 	// The buffer will contain {I,H,F,G,A,B,C,D,E}.
-	buffer []types.Bytes32
+	buffer [][]byte
 
 	// These slices map rows to the buffer.
 	// For instance, given the tree above:
@@ -45,11 +45,11 @@ type StaticTree struct {
 	// rows[1] = {H}
 	// rows[2] = {F,G}
 	// rows[3] = {A,B,C,D,E}
-	rows [][]types.Bytes32
+	rows [][][]byte
 }
 
 // NewStaticTree creates a static Merkle tree from a slice of leaves.
-func NewStaticTree(leaves []types.Bytes32) (*StaticTree, error) {
+func NewStaticTree(leaves [][]byte) (*StaticTree, error) {
 	numLeaves := len(leaves)
 	if numLeaves < 1 {
 		return nil, errors.New("tree should have at least one leaf")
@@ -68,15 +68,15 @@ func (t *StaticTree) LeavesLen() int {
 }
 
 // Root returns the Merkle root. Implements Tree.Root.
-func (t *StaticTree) Root() *types.Bytes32 {
+func (t *StaticTree) Root() []byte {
 	r := t.buffer[0]
-	return &r
+	return r
 }
 
 // Leaf returns the leaf at the specified index. Implements Tree.Leaf.
-func (t *StaticTree) Leaf(index int) *types.Bytes32 {
+func (t *StaticTree) Leaf(index int) []byte {
 	l := t.rows[len(t.rows)-1][index]
-	return &l
+	return l
 }
 
 // Path returns the path of a leaf to the Merkle root. Implements Tree.Path.
@@ -106,10 +106,10 @@ func (t *StaticTree) Path(index int) types.Path {
 func alloc(numLeaves int) *StaticTree {
 	var (
 		bufl    = numStaticTreeNodes(numLeaves)
-		buf     = make([]types.Bytes32, bufl)
+		buf     = make([][]byte, bufl)
 		rowsLen = staticTreeRowsLen(numLeaves)
 		depth   = len(rowsLen)
-		tree    = &StaticTree{buf, make([][]types.Bytes32, depth)}
+		tree    = &StaticTree{buf, make([][][]byte, depth)}
 		start   = 0
 		end     = 0
 	)
@@ -124,7 +124,7 @@ func alloc(numLeaves int) *StaticTree {
 }
 
 // Copies the leaves at the end of the buffer.
-func (t *StaticTree) copyLeaves(leaves []types.Bytes32) {
+func (t *StaticTree) copyLeaves(leaves [][]byte) {
 	copy(t.rows[len(t.rows)-1], leaves)
 }
 
@@ -137,9 +137,9 @@ func (t *StaticTree) compute() {
 		for col := 0; col < rowLen; col++ {
 			r, c := t.dleft(row, col)
 			// Write never returns an error.
-			hash.Write(t.rows[r][c][:])
+			hash.Write(t.rows[r][c])
 			r, c = t.dright(row, col)
-			hash.Write(t.rows[r][c][:])
+			hash.Write(t.rows[r][c])
 			t.write(hash.Sum(nil), row, col)
 			hash.Reset()
 		}
@@ -150,28 +150,29 @@ func (t *StaticTree) compute() {
 func (t *StaticTree) triplet(triplet *types.MerkleNodeHashes, row, col int) {
 	r, c := t.left(row, col)
 	if r >= 0 {
-		t.read(triplet.Left[:], r, c)
-		t.read(triplet.Right[:], row, col)
+		t.read(&triplet.Left, r, c)
+		t.read(&triplet.Right, row, col)
 	} else {
-		t.read(triplet.Left[:], row, col)
+		t.read(&triplet.Left, row, col)
 		r, c = t.right(row, col)
-		t.read(triplet.Right[:], r, c)
+		t.read(&triplet.Right, r, c)
 	}
 
 	if row > 0 {
 		r, c = t.parent(row, col)
-		t.read(triplet.Parent[:], r, c)
+		t.read(&triplet.Parent, r, c)
 	}
 }
 
 // Reads the hash for given row and column.
-func (t *StaticTree) read(dst []byte, row, col int) {
-	copy(dst, t.rows[row][col][:])
+func (t *StaticTree) read(dst *[]byte, row, col int) {
+	*dst = t.rows[row][col]
 }
 
 // Writes the hash for given row and column.
 func (t *StaticTree) write(src []byte, row, col int) {
-	copy(t.rows[row][col][:], src)
+	t.rows[row][col] = make([]byte, len(src), len(src))
+	copy(t.rows[row][col], src)
 }
 
 // Returns the position of the node to the left of given row and column.

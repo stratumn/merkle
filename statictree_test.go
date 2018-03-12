@@ -19,7 +19,6 @@ import (
 
 	"github.com/stratumn/merkle"
 	"github.com/stratumn/merkle/treetestcases"
-	"github.com/stratumn/merkle/types"
 )
 
 func TestNewStaticTree_noLeaves(t *testing.T) {
@@ -34,7 +33,7 @@ func TestNewStaticTree_noLeaves(t *testing.T) {
 
 func TestStaticTree(t *testing.T) {
 	treetestcases.Factory{
-		New: func(leaves []types.Bytes32) (merkle.Tree, error) {
+		New: func(leaves [][]byte) (merkle.Tree, error) {
 			return merkle.NewStaticTree(leaves)
 		},
 	}.RunTests(t)
@@ -42,7 +41,7 @@ func TestStaticTree(t *testing.T) {
 
 func BenchmarkStaticTree(b *testing.B) {
 	treetestcases.Factory{
-		New: func(leaves []types.Bytes32) (merkle.Tree, error) {
+		New: func(leaves [][]byte) (merkle.Tree, error) {
 			return merkle.NewStaticTree(leaves)
 		},
 	}.RunBenchmarks(b)

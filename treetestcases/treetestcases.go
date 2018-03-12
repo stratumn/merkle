@@ -17,6 +17,7 @@ package treetestcases
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io/ioutil"
 	"log"
@@ -82,7 +83,7 @@ func LoadFixtures(testdatapath string) {
 // run the tests on a Merkle tree implementation.
 type Factory struct {
 	// New create a Merkle tree from leaves.
-	New func(leaves []types.Bytes32) (merkle.Tree, error)
+	New func(leaves [][]byte) (merkle.Tree, error)
 
 	// Free is an optional function to free a Merkle tree.
 	Free func(tree merkle.Tree)
@@ -114,11 +115,11 @@ func (f Factory) free(tree merkle.Tree) {
 func (f Factory) TestNumLeaves(t *testing.T) {
 	tests := []struct {
 		expected int
-		leaves   []types.Bytes32
+		leaves   [][]byte
 	}{
-		{1, []types.Bytes32{*testutil.RandomHash()}},
-		{2, []types.Bytes32{*testutil.RandomHash(), *testutil.RandomHash()}},
-		{3, []types.Bytes32{*testutil.RandomHash(), *testutil.RandomHash(), *testutil.RandomHash()}},
+		{1, [][]byte{testutil.RandomHash()}},
+		{2, [][]byte{testutil.RandomHash(), testutil.RandomHash()}},
+		{3, [][]byte{testutil.RandomHash(), testutil.RandomHash(), testutil.RandomHash()}},
 	}
 
 	for _, test := range tests {
@@ -152,9 +153,10 @@ func (f Factory) TestRoot(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		var leaves = make([]types.Bytes32, len(test.leaves), len(test.leaves))
+		var leaves = make([][]byte, len(test.leaves), len(test.leaves))
 		for i, s := range test.leaves {
-			leaves[i] = sha256.Sum256([]byte(s))
+			hash := sha256.Sum256([]byte(s))
+			leaves[i] = hash[:]
 		}
 
 		tree, err := f.New(leaves)
@@ -163,7 +165,7 @@ func (f Factory) TestRoot(t *testing.T) {
 		}
 		defer f.free(tree)
 
-		if got, want := tree.Root().String(), test.expected; got != want {
+		if got, want := hex.EncodeToString(tree.Root()), test.expected; got != want {
 			t.Errorf("test#%d: tree.Root() = %q want %q", i, got, want)
 		}
 	}
@@ -172,9 +174,9 @@ func (f Factory) TestRoot(t *testing.T) {
 // TestLeaf tests that the implementation correctly returns leaves.
 func (f Factory) TestLeaf(t *testing.T) {
 	for i := 1; i < 128; i++ {
-		var leaves []types.Bytes32
+		var leaves [][]byte
 		for j := 0; j < i; j++ {
-			leaves = append(leaves, *testutil.RandomHash())
+			leaves = append(leaves, testutil.RandomHash())
 		}
 
 		tree, err := f.New(leaves)
@@ -184,7 +186,7 @@ func (f Factory) TestLeaf(t *testing.T) {
 		defer f.free(tree)
 
 		for j := 0; j < i; j++ {
-			if got, want := tree.Leaf(j).String(), leaves[j].String(); got != want {
+			if got, want := hex.EncodeToString(tree.Leaf(j)), hex.EncodeToString(leaves[j]); got != want {
 				t.Errorf("test#%d: tree.Leaf(%d) = %q want %q", i, j, got, want)
 			}
 		}
@@ -220,9 +222,10 @@ func (f Factory) TestPath(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		var leaves = make([]types.Bytes32, len(test.leaves), len(test.leaves))
+		var leaves = make([][]byte, len(test.leaves), len(test.leaves))
 		for i, s := range test.leaves {
-			leaves[i] = sha256.Sum256([]byte(s))
+			hash := sha256.Sum256([]byte(s))
+			leaves[i] = hash[:]
 		}
 
 		tree, err := f.New(leaves)
@@ -249,9 +252,9 @@ func (f Factory) TestPath(t *testing.T) {
 // random trees.
 func (f Factory) TestPathRandom(t *testing.T) {
 	for i := 0; i < 10; i++ {
-		tests := make([]types.Bytes32, 2+rand.Intn(10000))
+		tests := make([][]byte, 2+rand.Intn(10000))
 		for j := range tests {
-			tests[j] = *testutil.RandomHash()
+			tests[j] = testutil.RandomHash()
 		}
 
 		tree, err := f.New(tests)
@@ -266,7 +269,7 @@ func (f Factory) TestPathRandom(t *testing.T) {
 				t.Errorf("path.Validate(): err: %s", err)
 			}
 
-			if got, want := path[len(path)-1].Parent.String(), tree.Root().String(); got != want {
+			if got, want := hex.EncodeToString(path[len(path)-1].Parent), hex.EncodeToString(tree.Root()); got != want {
 				t.Errorf("test#%d: tree.Path(%d) last parent = %q want %q", i, j, got, want)
 			}
 		}
@@ -275,9 +278,9 @@ func (f Factory) TestPathRandom(t *testing.T) {
 
 // BenchmarkCreateWithSize benchmarks creating trees of given size.
 func (f Factory) BenchmarkCreateWithSize(b *testing.B, size int) {
-	leaves := make([]types.Bytes32, size)
+	leaves := make([][]byte, size)
 	for i := 0; i < size; i++ {
-		leaves[i] = *testutil.RandomHash()
+		leaves[i] = testutil.RandomHash()
 	}
 
 	b.ResetTimer()
@@ -303,9 +306,9 @@ func (f Factory) BenchmarkCreate(b *testing.B) {
 
 // BenchmarkPathWithSize benchmarks computing paths for trees of given size.
 func (f Factory) BenchmarkPathWithSize(b *testing.B, size int) {
-	leaves := make([]types.Bytes32, size)
+	leaves := make([][]byte, size)
 	for i := 0; i < size; i++ {
-		leaves[i] = *testutil.RandomHash()
+		leaves[i] = testutil.RandomHash()
 	}
 
 	tree, err := f.New(leaves)
@@ -329,8 +332,4 @@ func (f Factory) BenchmarkPath(b *testing.B) {
 	b.Run("1000-leaves", func(b *testing.B) { f.BenchmarkPathWithSize(b, 1000) })
 	b.Run("10000-leaves", func(b *testing.B) { f.BenchmarkPathWithSize(b, 10000) })
 	b.Run("100000-leaves", func(b *testing.B) { f.BenchmarkPathWithSize(b, 100000) })
-}
-
-func atos(a types.Bytes32) []byte {
-	return a[:]
 }

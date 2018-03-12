@@ -15,20 +15,20 @@
 package merkle_test
 
 import (
+	"encoding/hex"
 	"testing"
 
 	"github.com/stratumn/merkle"
 	"github.com/stratumn/merkle/testutil"
 	"github.com/stratumn/merkle/treetestcases"
-	"github.com/stratumn/merkle/types"
 )
 
 func TestDynTree(t *testing.T) {
 	treetestcases.Factory{
-		New: func(leaves []types.Bytes32) (merkle.Tree, error) {
+		New: func(leaves [][]byte) (merkle.Tree, error) {
 			tree := merkle.NewDynTree(len(leaves))
 			for _, leaf := range leaves {
-				tree.Add(&leaf)
+				tree.Add(leaf)
 			}
 			return tree, nil
 		},
@@ -37,11 +37,11 @@ func TestDynTree(t *testing.T) {
 
 func TestDynTreePause(t *testing.T) {
 	treetestcases.Factory{
-		New: func(leaves []types.Bytes32) (merkle.Tree, error) {
+		New: func(leaves [][]byte) (merkle.Tree, error) {
 			tree := merkle.NewDynTree(len(leaves))
 			tree.Pause()
 			for _, leaf := range leaves {
-				tree.Add(&leaf)
+				tree.Add(leaf)
 			}
 			tree.Resume()
 			return tree, nil
@@ -64,32 +64,32 @@ func TestDynTreeUpdate(t *testing.T) {
 
 	tree.Update(2, testutil.RandomHash())
 	r1 := tree.Root()
-	if got, notWant := r1.String(), r0.String(); got == notWant {
+	if got, notWant := hex.EncodeToString(r1), hex.EncodeToString(r0); got == notWant {
 		t.Errorf("tree.Root() = %q want not %q", got, notWant)
 	}
 
 	tree.Update(5, testutil.RandomHash())
-	if got, notWant := tree.Root().String(), r1.String(); got == notWant {
+	if got, notWant := hex.EncodeToString(tree.Root()), hex.EncodeToString(r1); got == notWant {
 		t.Errorf("tree.Root() = %q want not %q", got, notWant)
 	}
 
 	tree.Update(5, l5)
-	if got, want := tree.Root().String(), r1.String(); got != want {
+	if got, want := hex.EncodeToString(tree.Root()), hex.EncodeToString(r1); got != want {
 		t.Errorf("tree.Root() = %q want %q", got, want)
 	}
 
 	tree.Update(2, l2)
-	if got, want := tree.Root().String(), r0.String(); got != want {
+	if got, want := hex.EncodeToString(tree.Root()), hex.EncodeToString(r0); got != want {
 		t.Errorf("tree.Root() = %q want %q", got, want)
 	}
 }
 
 func BenchmarkDynTree(b *testing.B) {
 	treetestcases.Factory{
-		New: func(leaves []types.Bytes32) (merkle.Tree, error) {
+		New: func(leaves [][]byte) (merkle.Tree, error) {
 			tree := merkle.NewDynTree(len(leaves))
 			for _, leaf := range leaves {
-				tree.Add(&leaf)
+				tree.Add(leaf)
 			}
 			return tree, nil
 		},
@@ -98,11 +98,11 @@ func BenchmarkDynTree(b *testing.B) {
 
 func BenchmarkDynTreePause(b *testing.B) {
 	treetestcases.Factory{
-		New: func(leaves []types.Bytes32) (merkle.Tree, error) {
+		New: func(leaves [][]byte) (merkle.Tree, error) {
 			tree := merkle.NewDynTree(len(leaves))
 			tree.Pause()
 			for _, leaf := range leaves {
-				tree.Add(&leaf)
+				tree.Add(leaf)
 			}
 			tree.Resume()
 			return tree, nil

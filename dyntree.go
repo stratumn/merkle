@@ -24,7 +24,7 @@ import (
 
 // DynTreeNode is a node within a DynTree.
 type DynTreeNode struct {
-	hash   types.Bytes32
+	hash   []byte
 	left   *DynTreeNode
 	right  *DynTreeNode
 	parent *DynTreeNode
@@ -32,9 +32,8 @@ type DynTreeNode struct {
 }
 
 // Hash returns the hash of the node.
-func (n *DynTreeNode) Hash() *types.Bytes32 {
-	hash := n.hash
-	return &hash
+func (n *DynTreeNode) Hash() []byte {
+	return n.hash
 }
 
 // Left returns the node to the left, if any.
@@ -52,19 +51,19 @@ func (n *DynTreeNode) Parent() *DynTreeNode {
 	return n.parent
 }
 
-func (n *DynTreeNode) rehash(h hash.Hash, a, b *types.Bytes32, rehashParent bool) {
+func (n *DynTreeNode) rehash(h hash.Hash, a, b []byte, rehashParent bool) {
 	h.Reset()
 
 	// Write never returns an error.
-	h.Write(a[:])
-	h.Write(b[:])
-	copy(n.hash[:], h.Sum(nil))
+	h.Write(a)
+	h.Write(b)
+	n.hash = h.Sum(nil)
 
 	if rehashParent && n.parent != nil {
 		if n.left != nil {
-			n.parent.rehash(h, &n.left.hash, &n.hash, true)
+			n.parent.rehash(h, n.left.hash, n.hash, true)
 		} else {
-			n.parent.rehash(h, &n.hash, &n.right.hash, true)
+			n.parent.rehash(h, n.hash, n.right.hash, true)
 		}
 	}
 }
@@ -97,12 +96,12 @@ func (t *DynTree) LeavesLen() int {
 }
 
 // Root returns the Merkle root. Implements Tree.Root.
-func (t *DynTree) Root() *types.Bytes32 {
+func (t *DynTree) Root() []byte {
 	return t.root.Hash()
 }
 
 // Leaf returns the leaf at the specified index. Implements Tree.Leaf.
-func (t *DynTree) Leaf(index int) *types.Bytes32 {
+func (t *DynTree) Leaf(index int) []byte {
 	return t.leaves[index].Hash()
 }
 
@@ -144,11 +143,11 @@ func (t *DynTree) Path(index int) types.Path {
 }
 
 // Add adds a leaf to the tree.
-func (t *DynTree) Add(leaf *types.Bytes32) {
+func (t *DynTree) Add(leaf []byte) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	t.nodes = append(t.nodes, DynTreeNode{hash: *leaf})
+	t.nodes = append(t.nodes, DynTreeNode{hash: leaf})
 	node := &t.nodes[len(t.nodes)-1]
 	t.leaves = append(t.leaves, node)
 
@@ -184,24 +183,24 @@ func (t *DynTree) Add(leaf *types.Bytes32) {
 		}
 
 		if !t.paused {
-			parent.rehash(t.hash, &left.hash, leaf, true)
+			parent.rehash(t.hash, left.hash, leaf, true)
 		}
 	}
 }
 
 // Update updates a leaf of the tree.
-func (t *DynTree) Update(index int, hash *types.Bytes32) {
+func (t *DynTree) Update(index int, hash []byte) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
 	node := t.leaves[index]
-	node.hash = *hash
+	node.hash = hash
 
 	if !t.paused {
 		if node.left != nil {
-			node.parent.rehash(t.hash, &node.left.hash, hash, true)
+			node.parent.rehash(t.hash, node.left.hash, hash, true)
 		} else if node.right != nil {
-			node.parent.rehash(t.hash, hash, &node.right.hash, true)
+			node.parent.rehash(t.hash, hash, node.right.hash, true)
 		}
 	}
 }
@@ -235,7 +234,7 @@ func (t *DynTree) recompute() {
 		for i := 0; i < len(rows); i += 2 {
 			node := rows[i]
 			if node.parent != nil && node.parent.height == height+1 {
-				node.parent.rehash(t.hash, &node.hash, &node.right.hash, false)
+				node.parent.rehash(t.hash, node.hash, node.right.hash, false)
 				top = append(top, node.parent)
 			}
 		}

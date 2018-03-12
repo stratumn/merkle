@@ -16,9 +16,7 @@ package types_test
 
 import (
 	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"testing"
 
@@ -39,20 +37,20 @@ func loadPath(filename string, path *types.Path) error {
 
 func TestMerkleNodeHashesValidate_OK(t *testing.T) {
 	var (
-		left  = *testutil.RandomHash()
-		right = *testutil.RandomHash()
+		left  = testutil.RandomHash()
+		right = testutil.RandomHash()
 		h     = types.MerkleNodeHashes{Left: left, Right: right}
 		hash  = sha256.New()
 	)
 
-	if _, err := hash.Write(left[:]); err != nil {
+	if _, err := hash.Write(left); err != nil {
 		t.Fatalf("hash.Write(): err: %s", err)
 	}
-	if _, err := hash.Write(right[:]); err != nil {
+	if _, err := hash.Write(right); err != nil {
 		t.Fatalf("hash.Write(): err: %s", err)
 	}
 
-	copy(h.Parent[:], hash.Sum(nil))
+	h.Parent = hash.Sum(nil)
 
 	if err := h.Validate(); err != nil {
 		t.Errorf("h.Validate(): err: %s", err)
@@ -61,9 +59,9 @@ func TestMerkleNodeHashesValidate_OK(t *testing.T) {
 
 func TestMerkleNodeHashesValidate_Error(t *testing.T) {
 	h := types.MerkleNodeHashes{
-		Left:   *testutil.RandomHash(),
-		Right:  *testutil.RandomHash(),
-		Parent: *testutil.RandomHash(),
+		Left:   testutil.RandomHash(),
+		Right:  testutil.RandomHash(),
+		Parent: testutil.RandomHash(),
 	}
 	if err := h.Validate(); err == nil {
 		t.Error("h.Validate(): err = nil want Error")
@@ -107,53 +105,5 @@ func TestPathValidate_Error(t *testing.T) {
 	}
 	if err := pathInvalid1.Validate(); err == nil {
 		t.Error("pathInvalid1.Validate(): err = nil want Error")
-	}
-}
-
-func TestTransactionIDString(t *testing.T) {
-	str := "8353334c6e4911e6ad927bd17dea491a"
-	buf, _ := hex.DecodeString(str)
-	txid := types.TransactionID(buf)
-
-	if got, want := txid.String(), str; got != want {
-		t.Errorf("txid.String() = %q want %q", got, want)
-	}
-}
-
-func TestTransactionMarshalJSON(t *testing.T) {
-	str := "8353334c6e4911e6ad927bd17dea491a"
-	buf, _ := hex.DecodeString(str)
-	txid := types.TransactionID(buf)
-	marshalled, err := json.Marshal(txid)
-	if err != nil {
-		t.Fatalf("json.Marshal(): err: %s", err)
-	}
-
-	if got, want := string(marshalled), fmt.Sprintf(`"%s"`, str); got != want {
-		t.Errorf("txid.MarshalJSON() = %q want %q", got, want)
-	}
-}
-
-func TestTransactionUnmarshalJSON(t *testing.T) {
-	str := "8353334c6e4911e6ad927bd17dea491a"
-	marshalled := fmt.Sprintf(`"%s"`, str)
-	var txid types.TransactionID
-	err := json.Unmarshal([]byte(marshalled), &txid)
-	if err != nil {
-		t.Fatalf("json.Unmarshal(): err: %s", err)
-	}
-
-	if got, want := txid.String(), str; got != want {
-		t.Errorf("txid.UnmarshalJSON() = %q want %q", got, want)
-	}
-}
-
-func TestTransactionUnmarshalJSON_invalid(t *testing.T) {
-	str := "azertyu"
-	marshalled := fmt.Sprintf(`"%s"`, str)
-	var txid types.TransactionID
-	err := json.Unmarshal([]byte(marshalled), &txid)
-	if err == nil {
-		t.Error("json.Unmarshal(): err = nil want Error")
 	}
 }

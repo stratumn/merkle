@@ -15,6 +15,7 @@
 package types
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -23,9 +24,9 @@ import (
 
 // MerkleNodeHashes contains a left, right, and parent hash.
 type MerkleNodeHashes struct {
-	Left   Bytes32 `json:"left"`
-	Right  Bytes32 `json:"right"`
-	Parent Bytes32 `json:"parent"`
+	Left   []byte `json:"left"`
+	Right  []byte `json:"right"`
+	Parent []byte `json:"parent"`
 }
 
 // Path contains the necessary hashes to go from a leaf to a Merkle root.
@@ -35,20 +36,19 @@ type Path []MerkleNodeHashes
 func (h MerkleNodeHashes) Validate() error {
 	hash := sha256.New()
 
-	if _, err := hash.Write(h.Left[:]); err != nil {
+	if _, err := hash.Write(h.Left); err != nil {
 		return err
 	}
-	if _, err := hash.Write(h.Right[:]); err != nil {
+	if _, err := hash.Write(h.Right); err != nil {
 		return err
 	}
 
-	var expected Bytes32
-	copy(expected[:], hash.Sum(nil))
+	expected := hash.Sum(nil)
 
-	if h.Parent != expected {
+	if bytes.Compare(h.Parent, expected) != 0 {
 		var (
-			got  = h.Parent.String()
-			want = hex.EncodeToString(expected[:])
+			got  = hex.EncodeToString(h.Parent)
+			want = hex.EncodeToString(expected)
 		)
 		return fmt.Errorf("unexpected parent hash got %q want %q", got, want)
 	}
@@ -66,11 +66,11 @@ func (p Path) Validate() error {
 		if i < len(p)-1 {
 			up := p[i+1]
 
-			if h.Parent != up.Left && h.Parent != up.Right {
+			if bytes.Compare(h.Parent, up.Left) != 0 && bytes.Compare(h.Parent, up.Right) != 0 {
 				var (
-					e  = hex.EncodeToString(h.Parent[:])
-					a1 = hex.EncodeToString(up.Left[:])
-					a2 = hex.EncodeToString(up.Right[:])
+					e  = hex.EncodeToString(h.Parent)
+					a1 = hex.EncodeToString(up.Left)
+					a2 = hex.EncodeToString(up.Right)
 				)
 				return fmt.Errorf("could not find parent hash %q, got %q and %q", e, a1, a2)
 			}
@@ -80,25 +80,38 @@ func (p Path) Validate() error {
 	return nil
 }
 
-// TransactionID is a blockchain transaction ID.
-type TransactionID []byte
-
-// String returns a hex encoded string.
-func (txid TransactionID) String() string {
-	return hex.EncodeToString(txid)
+// JSONMerkleNodeHashes is used to Marshal/Unmarshal MerkleNodeHashes type with
+// hex representation.
+type JSONMerkleNodeHashes struct {
+	Left   string `json:"left"`
+	Right  string `json:"right"`
+	Parent string `json:"parent"`
 }
 
 // MarshalJSON implements encoding/json.Marshaler.MarshalJSON.
-func (txid TransactionID) MarshalJSON() ([]byte, error) {
-	return json.Marshal(txid.String())
+func (h *MerkleNodeHashes) MarshalJSON() ([]byte, error) {
+	return json.Marshal(JSONMerkleNodeHashes{
+		Left:   hex.EncodeToString(h.Left),
+		Right:  hex.EncodeToString(h.Right),
+		Parent: hex.EncodeToString(h.Parent),
+	})
 }
 
 // UnmarshalJSON implements encoding/json.Unmarshaler.UnmarshalJSON.
-func (txid *TransactionID) UnmarshalJSON(data []byte) (err error) {
-	var s string
-	if err = json.Unmarshal(data, &s); err != nil {
-		return
+func (h *MerkleNodeHashes) UnmarshalJSON(data []byte) error {
+	var j JSONMerkleNodeHashes
+	if err := json.Unmarshal(data, &j); err != nil {
+		return err
 	}
-	*txid, err = hex.DecodeString(s)
-	return
+	var err error
+	if h.Left, err = hex.DecodeString(j.Left); err != nil {
+		return err
+	}
+	if h.Right, err = hex.DecodeString(j.Right); err != nil {
+		return err
+	}
+	if h.Parent, err = hex.DecodeString(j.Parent); err != nil {
+		return err
+	}
+	return nil
 }

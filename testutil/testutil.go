@@ -17,19 +17,17 @@ package testutil
 
 import (
 	"math/rand"
-
-	"github.com/stratumn/merkle/types"
 )
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 // RandomHash creates a random hash.
-func RandomHash() *types.Bytes32 {
-	var hash types.Bytes32
+func RandomHash() []byte {
+	var hash [32]byte
 	for i := range hash {
 		hash[i] = byte(letters[rand.Intn(len(letters))])
 	}
-	return &hash
+	return hash[:]
 }
 
 // RandomString generates a random string.

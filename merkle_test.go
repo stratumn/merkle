@@ -15,6 +15,7 @@
 package merkle_test
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"math/rand"
 	"reflect"
@@ -22,14 +23,13 @@ import (
 
 	"github.com/stratumn/merkle"
 	"github.com/stratumn/merkle/testutil"
-	"github.com/stratumn/merkle/types"
 )
 
 func TestTreeConsistency(t *testing.T) {
 	for i := 0; i < 10; i++ {
-		tests := make([]types.Bytes32, 1+rand.Intn(1000))
+		tests := make([][]byte, 1+rand.Intn(1000))
 		for j := range tests {
-			tests[j] = *testutil.RandomHash()
+			tests[j] = testutil.RandomHash()
 		}
 
 		static, err := merkle.NewStaticTree(tests)
@@ -39,10 +39,10 @@ func TestTreeConsistency(t *testing.T) {
 
 		dyn := merkle.NewDynTree(len(tests) * 2)
 		for _, leaf := range tests {
-			dyn.Add(&leaf)
+			dyn.Add(leaf)
 		}
 
-		if got, want := static.Root().String(), dyn.Root().String(); got != want {
+		if got, want := hex.EncodeToString(static.Root()), hex.EncodeToString(dyn.Root()); got != want {
 			t.Errorf("static.Root() = %q want %q", got, want)
 		}
 

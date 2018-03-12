@@ -20,21 +20,16 @@ import (
 	"github.com/stratumn/merkle/types"
 )
 
-const (
-	// HashByteSize is the length of a hash or leaf measured in bytes.
-	HashByteSize = types.Bytes32Size
-)
-
 // Tree must be implemented by Merkle tree implementations.
 type Tree interface {
 	// LeavesLen returns the number of leaves.
 	LeavesLen() int
 
 	// Root returns the Merkle root.
-	Root() *types.Bytes32
+	Root() []byte
 
 	// Leaf returns the leaf at the specified index.
-	Leaf(index int) *types.Bytes32
+	Leaf(index int) []byte
 
 	// Path returns the path of a leaf to the Merkle root.
 	Path(index int) types.Path
